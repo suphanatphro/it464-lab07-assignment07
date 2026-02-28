@@ -1,4 +1,9 @@
 <?php
+// เปิดระบบโชว์ Error ไว้ชั่วคราว ถ้ามีอะไรพังจะได้เห็นตัวหนังสือ ไม่เจอหน้าขาว 500
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 function readSecret($secretName) {
     $path = "/run/secrets/" . $secretName;
     return file_exists($path) ? trim(file_get_contents($path)) : null;
@@ -7,16 +12,16 @@ function readSecret($secretName) {
 $host = 'db-server';
 $user = 'app_user';
 $pass = readSecret('db_user_pass');
-$db   = 'my_app_db';
+// แก้ชื่อฐานข้อมูลให้ตรงกับไฟล์ .env และ seed-data.sql ครับ
+$db   = 'suphanat_db';
 
 $conn = new mysqli($host, $user, $pass, $db);
 
 if ($conn->connect_error) {
-    die("<div class='alert alert-danger'>❌ Connection failed: " . $conn->connect_error . "</div>");
+    die("<div class='alert alert-danger m-5'>❌ Connection failed: " . $conn->connect_error . "</div>");
 }
 
-// เปลี่ยนเป็น ORDER BY id ASC (น้อยไปมาก)
-$result = $conn->query("SELECT * FROM students ORDER BY id ASC");
+$result = $conn->query("SELECT * FROM students ORDER BY student_id ASC");
 ?>
 
 <!DOCTYPE html>
@@ -25,9 +30,9 @@ $result = $conn->query("SELECT * FROM students ORDER BY id ASC");
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Modern Student Dashboard</title>
-    <link href="https://cdn.jsdelivr.net" rel="stylesheet">
-    <link href="https://fonts.googleapis.com" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
     
     <style>
         :root {
@@ -94,7 +99,7 @@ $result = $conn->query("SELECT * FROM students ORDER BY id ASC");
         }
 
         .bg-submitted { background: #dcfce7; color: #166534; }
-        .bg-progress { background: #fef9c3; color: #854d0e; }
+        .bg-inprogress { background: #fef9c3; color: #854d0e; }
         .bg-pending { background: #f1f5f9; color: #475569; }
 
         .time-display {
@@ -118,7 +123,7 @@ $result = $conn->query("SELECT * FROM students ORDER BY id ASC");
     <p class="opacity-75">Containerized Application with Docker Configs & Secrets</p>
 </div>
 
-<div class="container">
+<div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-lg-11">
             <div class="main-card border-0 card">
@@ -146,10 +151,13 @@ $result = $conn->query("SELECT * FROM students ORDER BY id ASC");
                             </tr>
                         </thead>
                         <tbody>
-                            <?php while($row = $result->fetch_assoc()): 
-                                $statusSlug = strtolower(str_replace(' ', '', $row['status']));
-                                // จัดรูปแบบวันที่ไทย
-                                $date = date("d/m/Y H:i:s", strtotime($row['submitted_at']));
+                            <?php 
+                            // เพิ่มการดักจับ (If) เพื่อป้องกัน Error 500 กรณีที่คิวรี่พังหรือไม่มีข้อมูล
+                            if ($result && $result->num_rows > 0):
+                                while($row = $result->fetch_assoc()): 
+                                    $statusSlug = strtolower(str_replace(' ', '', $row['status']));
+                                    // จัดรูปแบบวันที่ไทย
+                                    $date = date("d/m/Y H:i:s", strtotime($row['submitted_at']));
                             ?>
                             <tr>
                                 <td class="fw-bold text-primary"><?= sprintf("%02d", $row['id']) ?></td>
@@ -167,7 +175,16 @@ $result = $conn->query("SELECT * FROM students ORDER BY id ASC");
                                     <?= $date ?> น.
                                 </td>
                             </tr>
-                            <?php endwhile; ?>
+                            <?php 
+                                endwhile; 
+                            else:
+                            ?>
+                                <tr>
+                                    <td colspan="7" class="text-center p-4 text-muted">
+                                        ไม่พบข้อมูลนักศึกษา กรุณาตรวจสอบการสร้างตารางใน Database
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -181,4 +198,8 @@ $result = $conn->query("SELECT * FROM students ORDER BY id ASC");
 
 </body>
 </html>
-<?php $conn->close(); ?>
+<?php 
+if ($conn) {
+    $conn->close(); 
+}
+?>
